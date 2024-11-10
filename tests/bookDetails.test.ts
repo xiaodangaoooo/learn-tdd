@@ -1,7 +1,7 @@
 import { Response } from 'express';
-import Book from '../models/book'; // Adjust the import to your Book model path
-import BookInstance from '../models/bookinstance'; // Adjust the import to your BookInstance model path
-import { showBookDtls } from '../pages/book_details'; // Adjust the import to where showBookDtls is defined
+import Book from '../models/book';
+import BookInstance from '../models/bookinstance';
+import { showBookDtls } from '../pages/book_details';
 
 describe('showBookDtls', () => {
     let res: Partial<Response>;
@@ -16,26 +16,26 @@ describe('showBookDtls', () => {
 
     beforeEach(() => {
         res = {
-            status: jest.fn().mockReturnThis(), // Chaining for status
+            status: jest.fn().mockReturnThis(),
             send: jest.fn()
         };
     });
 
     afterEach(() => {
-        jest.clearAllMocks(); // Clear mocks after each test
+        jest.clearAllMocks();
     });
 
     it('should return book details when the book and copies exist', async () => {
         // Mocking the Book model's findOne and populate methods
         const mockFindOne = jest.fn().mockReturnValue({
-            populate: jest.fn().mockReturnThis(), // Allows method chaining
-            exec: jest.fn().mockResolvedValue(mockBook) // Resolves to your mock book
+            populate: jest.fn().mockReturnThis(),
+            exec: jest.fn().mockResolvedValue(mockBook)
         });
         Book.findOne = mockFindOne;
 
         // Mocking the BookInstance model's find and select methods
         const mockFind = jest.fn().mockReturnValue({
-            select: jest.fn().mockReturnThis(), // Select is called here
+            select: jest.fn().mockReturnThis(),
             exec: jest.fn().mockResolvedValue(mockCopies)
         });
         BookInstance.find = mockFind;
@@ -56,20 +56,50 @@ describe('showBookDtls', () => {
         });
     });
 
-    it('should return 404 if there book instance is null', async () => {
-        const id = '12345';
-        // Mocking the Book model's findOne method to throw an error
-        BookInstance.find = jest.fn().mockReturnValue({
-            select: jest.fn().mockReturnThis(), // Select is called here
+    it('should return 404 if book is not found', async () => {
+        // Mocking the Book model to return null
+        const mockFindOne = jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnThis(),
             exec: jest.fn().mockResolvedValue(null)
         });
+        Book.findOne = mockFindOne;
+
+        // Mock BookInstance to return some copies (though they won't be used)
+        const mockFind = jest.fn().mockReturnValue({
+            select: jest.fn().mockReturnThis(),
+            exec: jest.fn().mockResolvedValue(mockCopies)
+        });
+        BookInstance.find = mockFind;
 
         // Act
-        await showBookDtls(res as Response, id);
+        await showBookDtls(res as Response, '12345');
 
         // Assert
         expect(res.status).toHaveBeenCalledWith(404);
-        expect(res.send).toHaveBeenCalledWith(`Book details not found for book ${id}`);
+        expect(res.send).toHaveBeenCalledWith('Book 12345 not found');
+    });
+
+    it('should return 404 if book instance is null', async () => {
+        // Mock Book to return a book
+        const mockFindOne = jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnThis(),
+            exec: jest.fn().mockResolvedValue(mockBook)
+        });
+        Book.findOne = mockFindOne;
+
+        // Mock BookInstance to return null
+        const mockFind = jest.fn().mockReturnValue({
+            select: jest.fn().mockReturnThis(),
+            exec: jest.fn().mockResolvedValue(null)
+        });
+        BookInstance.find = mockFind;
+
+        // Act
+        await showBookDtls(res as Response, '12345');
+
+        // Assert
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.send).toHaveBeenCalledWith('Book details not found for book 12345');
     });
 
     it('should return 500 if there is an error fetching the book', async () => {
@@ -87,7 +117,14 @@ describe('showBookDtls', () => {
     });
 
     it('should return 500 if there is an error fetching book instance', async () => {
-        // Mocking the Book model's findOne method to throw an error
+        // Mock Book to return successfully
+        const mockFindOne = jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnThis(),
+            exec: jest.fn().mockResolvedValue(mockBook)
+        });
+        Book.findOne = mockFindOne;
+
+        // Mock BookInstance to throw error
         BookInstance.find = jest.fn().mockImplementation(() => {
             throw new Error('Database error');
         });
@@ -98,5 +135,14 @@ describe('showBookDtls', () => {
         // Assert
         expect(res.status).toHaveBeenCalledWith(500);
         expect(res.send).toHaveBeenCalledWith('Error fetching book 12345');
+    });
+
+    it('should return null if id is not a string', async () => {
+        // Act
+        await showBookDtls(res as Response, null as any);
+
+        // Assert
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.send).toHaveBeenCalledWith('Book null not found');
     });
 });
